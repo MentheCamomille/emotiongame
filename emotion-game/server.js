@@ -6,14 +6,14 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // à sécuriser plus tard
+    origin: "*", 
     methods: ["GET", "POST"]
   }
 });
 
 const PORT = 3000;
 
-// Liste des thèmes
+
 const themes = [
   "Quand je me sens heureux, je vais dans un lieu…",
   "Quand je suis triste, je pense à…",
@@ -47,10 +47,8 @@ const themes = [
     "Quand je me sens entendu, je…"
 ];
 
-// Données du jeu
-let rooms = {}; // { roomCode: { players: {}, usedNumbers: Set, theme: "", status: "" } }
+let rooms = {}; 
 
-// Génère un code de salle (ex : AB123)
 function generateRoomCode() {
   return Math.random().toString(36).substring(2, 7).toUpperCase();
 }
@@ -66,12 +64,11 @@ function assignUniqueNumber(usedNumbers) {
 }
 
 
-// Fonction pour choisir un thème différent de l'actuel
 function getRandomTheme(currentTheme) {
   let newTheme;
   do {
     newTheme = themes[Math.floor(Math.random() * themes.length)];
-  } while (newThem)// << AJOUTE CETTE LIGNE pour afficher dans la pagee === currentTheme);
+  } while (newThem);
   return newTheme;
 }
 
@@ -154,7 +151,6 @@ socket.on('changeTheme', (roomCode) => {
 
 
 
-  // Thème envoyé par le maître du jeu (optionnel, si tu veux pouvoir changer de thème en cours)
   socket.on('startRound', ({ roomCode, theme }) => {
     const room = rooms[roomCode];
     if (!room) return;
@@ -184,7 +180,6 @@ socket.on('changeTheme', (roomCode) => {
     }
   });
 
-  // Déconnexion
   socket.on('disconnect', () => {
     for (const roomCode in rooms) {
       const room = rooms[roomCode];
