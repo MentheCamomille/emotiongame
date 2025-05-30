@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jeu des émotions 🎲</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+    #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: #f9f9f9; }
+    input, button { margin: 5px 0; padding: 8px; font-size: 1em; }
+    #theme { margin-top: 20px; font-weight: bold; font-size: 1.2em; color: #007700; }
+    #answerSection { margin-top: 20px; display: none; }
+    #playersList { margin-top: 10px; font-style: italic; }
+    #numberDisplay { margin-top: 5px; font-weight: bold; font-size: 1.1em; color: #004400; }
+  </style>
+</head>
+<body>
+  <h1>Jeu des émotions 🎲</h1>
+
+  <div>
+    <input id="nickname" placeholder="Ton pseudo" autocomplete="off" />
+  </div>
+
+  <div>
+    <button onclick="createRoom()">Créer une salle</button>
+  </div>
+
+  <div>
+    <input id="roomCode" placeholder="Code de salle" maxlength="5" autocomplete="off" />
+    <button onclick="joinRoom()">Rejoindre</button>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="theme"></div>
+  <div id="numberDisplay"></div>
+
+
+  <button id="changeThemeBtn" style="display:none; margin-top:10px;">Changer thème et chiffres</button>
+
+  <div id="playersList"></div>
+
+  <div id="answerSection">
+    <h3>Réponds au thème :</h3>
+    <textarea id="answerInput" rows="3" cols="50" placeholder="Écris ta réponse ici..."></textarea><br/>
+    <button onclick="submitAnswer()">Envoyer la réponse</button>
+  </div>
+
+  <script>
+    const socket = io("http://192.168.1.106:3000");
+    let currentRoom = null;
+    let nickname = null;
+
+    function log(msg) {
+      const logDiv = document.getElementById('log');
+      logDiv.innerHTML += `<p>${msg}</p>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function showTheme(theme) {
+      document.getElementById('theme').textContent = `🧠 Thème : ${theme}`;
+      document.getElementById('answerSection').style.display = 'block';
+      document.getElementById('changeThemeBtn').style.display = 'inline-block';
+    }
+
+    function updateNumber(number) {
+      document.getElementById('numberDisplay').textContent = `🔢 Ton chiffre : ${number}`;
+    }
+
+    function createRoom() {
+      nickname = document.getElementById('nickname').value.trim();
+      if (!nickname) return alert("Entre ton pseudo avant de créer une salle.");
+
+      socket.emit('createRoom', nickname, (res) => {
+        if (res.roomCode) {
+          currentRoom = res.roomCode;
+          log(`✅ Salle créée : ${res.roomCode}, Ton chiffre : ${res.number}`);
+          showTheme(res.theme);
+          updateNumber(res.number);
+          updatePlayers([nickname]); 
+        } else {
+          log("❌ Erreur lors de la création");
+        }
+      });
+    }
+
+    function joinRoom() {
+      nickname = document.getElementById('nickname').value.trim();
+      const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+
+      if (!nickname) return alert("Entre ton pseudo avant de rejoindre une salle.");
+      if (!roomCode) return alert("Entre le code de la salle.");
+
+      socket.emit('joinRoom', { roomCode, nickname }, (res) => {
+        if (res.error) {
+          log(`❌ ${res.error}`);
+        } else {
+          currentRoom = roomCode;
+          log(`✅ Rejoint la salle ${roomCode}, Ton chiffre : ${res.number}`);
+          showTheme(res.theme);
+          updateNumber(res.number);
+        }
+      });
+    }
+
+    socket.on('updatePlayers', (players) => {
+      updatePlayers(players);
+    });
+
+    socket.on('roundStarted', ({ theme }) => {
+      log(`🧠 Nouveau thème : ${theme}`);
+      showTheme(theme);
+    });
+
+    socket.on('updateNumber', (newNumber) => {
+        console.log("📲 [CLIENT] Nouveau numéro reçu :", newNumber);
+        updateNumber(newNumber); 
+    });
+
+
+
+    socket.on('allAnswers', (answers) => {
+      log("📦 Réponses des joueurs :");
+      for (const a of answers) {
+        log(`- ${a.nickname} a dit : "${a.answer}"`);
+      }
+      document.getElementById('answerSection').style.display = 'none';
+      document.getElementById('answerInput').value = '';
+      document.getElementById('answerInput').disabled = false;
+      document.querySelector('#answerSection button').disabled = false;
+    });
+
+    function submitAnswer() {
+      const answer = document.getElementById('answerInput').value.trim();
+      if (!answer) return alert("Écris ta réponse avant d'envoyer.");
+
+      if (!currentRoom) return alert("Tu n'es pas dans une salle.");
+
+      socket.emit('submitAnswer', { roomCode: currentRoom, answer });
+      log(`🕒 Réponse envoyée : "${answer}"`);
+
+      document.getElementById('answerInput').disabled = true;
+      document.querySelector('#answerSection button').disabled = true;
+    }
+
+    function updatePlayers(players) {
+      const playersList = document.getElementById('playersList');
+      if (players.length === 0) {
+        playersList.textContent = "Aucun joueur dans la salle.";
+      } else {
+        playersList.textContent = `👥 Joueurs connectés : ${players.join(", ")}`;
+      }
+    }
+
+    document.getElementById('changeThemeBtn').addEventListener('click', () => {
+      if (!currentRoom) return alert("Tu n'es pas dans une salle.");
+      socket.emit('changeTheme', currentRoom);
+      log("🔄 Demande de changement de thème et chiffres envoyée");
+    });
+  </script>
+</body>
+</html>
